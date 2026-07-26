@@ -25,7 +25,20 @@ test the connection, pick a user, save.
 No Jellyfin handy? Run the mock: `node tools/mock-jellyfin.mjs` (URL
 `http://localhost:8097`, API key `mock`).
 
-## Run (production-ish)
+## Run (Docker — the intended deployment)
+
+Runs on the **mobile** server, next to its Jellyfin:
+
+```sh
+docker compose up -d --build   # UI + API on :3131
+```
+
+Settings persist in `./data` (bind-mounted to `/data`). The container runs as the
+`node` user (uid 1000), so make sure `./data` is writable by that uid. In milestone 2
+you'll also mount the mobile Jellyfin's media folder — see the comment in
+[docker-compose.yml](docker-compose.yml).
+
+## Run (production-ish, no Docker)
 
 ```sh
 npm run build      # builds web/dist, typechecks server

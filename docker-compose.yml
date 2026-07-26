@@ -1,0 +1,13 @@
+# Runs on the MOBILE server (truck/RV) alongside its Jellyfin.
+services:
+  cloud-clone:
+    build: .
+    image: cloud-clone:latest
+    container_name: cloud-clone
+    restart: unless-stopped
+    ports:
+      - "3131:3131"
+    volumes:
+      - ./data:/data
+      # Milestone 2: mount the mobile Jellyfin's library so checkouts land in it, e.g.
+      # - /path/to/jellyfin/media:/media

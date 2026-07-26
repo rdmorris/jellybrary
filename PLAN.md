@@ -97,6 +97,13 @@ before you commit to a big checkout.
 4. **Watch-state sync + polish** — reconciliation on reconnect, next-N-unwatched
    checkout, disk-space guard, "return all watched".
 
+## Distribution
+
+Self-hosted open source, shipped as a Docker image (compose file in the repo, runs on
+the mobile server). A hosted/SaaS control plane on Vercel was considered and rejected:
+media transfers must stay direct between the user's own servers, and keeping API keys
+on the user's hardware is a better security story than any cloud can offer.
+
 ## Open questions
 
 - Auth for the web UI: probably a single shared password (it lives on a private LAN),
