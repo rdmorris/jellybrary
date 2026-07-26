@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm --version)",
+      "Read(//Users/gsd/**)",
+      "Bash(brew list *)",
+      "Bash(sw_vers)",
+      "Bash(curl -fsSL -o /Users/gsd/.cache-nvm-install.sh https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh)",
+      "Bash(bash /Users/gsd/.cache-nvm-install.sh)",
+      "Bash(git init *)"
+    ]
+  }
+}
