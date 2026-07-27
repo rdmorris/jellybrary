@@ -30,6 +30,9 @@ export interface Settings {
   'primary.userId': string | null
   'mobile.url': string | null
   'mobile.apiKey': string | null
+  'mobile.moviesDir': string | null
+  'mobile.showsDir': string | null
+  'transfer.concurrency': string | null
 }
 
 export interface TestResult {
@@ -38,6 +41,36 @@ export interface TestResult {
   version?: string
   users?: { id: string; name: string; admin: boolean }[]
   error?: string
+}
+
+export interface Checkout {
+  id: number
+  item_id: string
+  kind: 'Movie' | 'Episode'
+  title: string
+  year: number | null
+  series_name: string | null
+  season: number | null
+  episode: number | null
+  profile: string
+  status: 'queued' | 'transferring' | 'on_device' | 'error'
+  bytes_total: number
+  bytes_done: number
+  local_path: string | null
+  error: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CheckoutsResult {
+  checkouts: Checkout[]
+  checkedOutIds: string[]
+}
+
+export interface DeviceSpace {
+  configured: boolean
+  freeBytes?: number
+  totalBytes?: number
 }
 
 export class ApiError extends Error {
@@ -74,6 +107,19 @@ export const api = {
     return req<ItemsResult>('GET', `/api/browse/items?${qs}`)
   },
   item: (id: string) => req<JellyfinItem>('GET', `/api/browse/items/${id}`),
+  checkOut: (itemId: string) => req<{ queued: number; skipped: number }>('POST', '/api/checkouts', { itemId }),
+  checkouts: () => req<CheckoutsResult>('GET', '/api/checkouts'),
+  cancelCheckout: (id: number) => req<{ ok: true }>('DELETE', `/api/checkouts/${id}`),
+  retryCheckout: (id: number) => req<{ ok: true }>('POST', `/api/checkouts/${id}/retry`),
+  deviceSpace: () => req<DeviceSpace>('GET', '/api/device/space'),
+}
+
+export function formatBytes(bytes: number): string {
+  if (!bytes) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  const i = Math.min(units.length - 1, Math.floor(Math.log2(bytes) / 10))
+  const v = bytes / 2 ** (10 * i)
+  return `${v >= 100 ? v.toFixed(0) : v.toFixed(1)} ${units[i]}`
 }
 
 export function imageUrl(item: JellyfinItem, maxWidth = 320): string | null {

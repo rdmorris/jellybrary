@@ -1,9 +1,27 @@
 <script lang="ts">
-  import { fileSize, imageUrl, runtime, type JellyfinItem } from '../lib/api'
+  import { api, fileSize, imageUrl, runtime, type JellyfinItem } from '../lib/api'
 
   let { item, onclose }: { item: JellyfinItem; onclose: () => void } = $props()
 
   const poster = imageUrl(item, 480)
+
+  let working = $state(false)
+  let result = $state('')
+
+  async function checkOut() {
+    working = true
+    result = ''
+    try {
+      const res = await api.checkOut(item.Id)
+      if (res.queued === 0 && res.skipped > 0) result = 'Already checked out'
+      else if (res.skipped > 0) result = `Queued ${res.queued} (${res.skipped} already on device)`
+      else result = res.queued === 1 ? 'Queued ✓' : `Queued ${res.queued} episodes ✓`
+    } catch (e) {
+      result = `Failed: ${(e as Error).message}`
+    } finally {
+      working = false
+    }
+  }
 
   function onkeydown(e: KeyboardEvent) {
     if (e.key === 'Escape') onclose()
@@ -42,11 +60,16 @@
           <p class="overview">{item.Overview}</p>
         {/if}
         <div class="actions">
-          <button class="primary" disabled title="Checkout lands in milestone 2">
-            ⬇ Check out
+          <button class="primary" disabled={working} onclick={checkOut}>
+            {working ? 'Queuing…' : item.Type === 'Series' ? '⬇ Check out series' : '⬇ Check out'}
           </button>
-          <span class="muted"><small>Checkout arrives in milestone 2</small></span>
+          {#if result}
+            <span class={result.startsWith('Failed') ? 'error-text' : 'ok-text'}>{result}</span>
+          {/if}
         </div>
+        {#if item.Type === 'Series'}
+          <p class="muted"><small>Queues every episode. Season/episode selection is coming later.</small></p>
+        {/if}
       </div>
     </div>
   </div>

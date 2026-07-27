@@ -4,8 +4,10 @@ Library-checkout for Jellyfin: browse your primary (home) server, check media ou
 secondary mobile Jellyfin server (truck/RV) for off-grid use, and return it when done.
 See [PLAN.md](PLAN.md) for the full design.
 
-**Status: milestone 1** — browse the primary library (poster grid, search, detail view)
-and configure both servers. Checkout/transfers land in milestone 2.
+**Status: milestone 2** — browse the primary library, check out movies or whole series,
+watch transfers with progress/resume, and return items to free space. Set the
+**Library paths** in Settings so checkouts know where to land. Transcode profiles come
+in milestone 3; watch-state sync in milestone 4.
 
 ## Requirements
 

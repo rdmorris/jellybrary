@@ -4,6 +4,7 @@ import http from 'node:http'
 
 const PORT = Number(process.argv[2] ?? 8097)
 const API_KEY = 'mock'
+const CHUNK_DELAY_MS = Number(process.env.MOCK_CHUNK_DELAY ?? 15)
 
 const GENRES = ['Action', 'Drama', 'Comedy', 'Sci-Fi', 'Thriller', 'Documentary', 'Adventure']
 
@@ -28,6 +29,9 @@ function hash(s) {
   return Math.abs(h)
 }
 
+// Fake file size: 4-24 MB so transfers are fast but progress is observable.
+const fakeSize = (name) => (4 + (hash(name) % 21)) * 1024 * 1024
+
 const movies = MOVIE_NAMES.map((name, i) => ({
   Id: `movie-${i}`,
   Name: name,
@@ -40,9 +44,37 @@ const movies = MOVIE_NAMES.map((name, i) => ({
   OfficialRating: ['G', 'PG', 'PG-13', 'R'][hash(name) % 4],
   ImageTags: { Primary: `tag${i}` },
   ProviderIds: { Tmdb: String(100000 + i) },
-  MediaSources: [{ Size: (2 + (hash(name) % 30)) * 1024 ** 3 / 2, Container: 'mkv' }],
+  Path: `/library/movies/${name} (${1995 + (hash(name) % 30)})/${name.replaceAll(' ', '.')}.mkv`,
+  MediaSources: [
+    {
+      Size: fakeSize(name),
+      Container: 'mkv',
+      Path: `/library/movies/${name} (${1995 + (hash(name) % 30)})/${name.replaceAll(' ', '.')}.mkv`,
+    },
+  ],
   UserData: { Played: hash(name) % 3 === 0 },
 }))
+
+const episodes = SERIES_NAMES.flatMap((seriesName, si) =>
+  Array.from({ length: 2 }, (_, season) =>
+    Array.from({ length: 4 }, (_, ep) => {
+      const name = `${seriesName} S${season + 1}E${ep + 1}`
+      return {
+        Id: `ep-${si}-${season + 1}-${ep + 1}`,
+        Name: `Episode ${ep + 1}`,
+        Type: 'Episode',
+        SeriesName: seriesName,
+        SeriesId: `series-${si}`,
+        ParentIndexNumber: season + 1,
+        IndexNumber: ep + 1,
+        ProductionYear: 2005 + (hash(seriesName) % 20),
+        Path: `/library/shows/${seriesName}/Season ${String(season + 1).padStart(2, '0')}/${seriesName.replaceAll(' ', '.')}.S0${season + 1}E0${ep + 1}.mkv`,
+        MediaSources: [{ Size: fakeSize(name), Container: 'mkv' }],
+        UserData: { Played: false },
+      }
+    }),
+  ).flat(),
+)
 
 const series = SERIES_NAMES.map((name, i) => ({
   Id: `series-${i}`,
@@ -65,7 +97,15 @@ const views = [
   { Id: 'lib-shows', Name: 'Shows', Type: 'CollectionFolder', CollectionType: 'tvshows' },
 ]
 
-const all = [...movies, ...series]
+const all = [...movies, ...series, ...episodes]
+
+// Deterministic pseudo-random content so resumed downloads produce identical bytes.
+function fileChunk(itemId, start, end) {
+  const buf = Buffer.alloc(end - start)
+  const seed = hash(itemId)
+  for (let i = 0; i < buf.length; i++) buf[i] = (seed + start + i) % 256
+  return buf
+}
 
 const xmlEscape = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
@@ -102,6 +142,43 @@ const server = http.createServer((req, res) => {
 
   const imageMatch = url.pathname.match(/^\/Items\/([^/]+)\/Images\//)
   const itemMatch = url.pathname.match(/^\/Users\/[^/]+\/Items\/([^/]+)$/)
+  const downloadMatch = url.pathname.match(/^\/Items\/([^/]+)\/Download$/)
+  const episodesMatch = url.pathname.match(/^\/Shows\/([^/]+)\/Episodes$/)
+
+  if (downloadMatch) {
+    const item = all.find((i) => i.Id === downloadMatch[1])
+    if (!item) return send(404, { error: 'not found' })
+    const size = item.MediaSources[0].Size
+    const range = req.headers.range?.match(/bytes=(\d+)-/)
+    const start = range ? Number(range[1]) : 0
+    const headers = {
+      'content-type': 'video/x-matroska',
+      'content-length': String(size - start),
+      ...(range ? { 'content-range': `bytes ${start}-${size - 1}/${size}` } : {}),
+    }
+    res.writeHead(range ? 206 : 200, headers)
+    // Stream in ~256KB chunks with tiny delays so progress is visible in the UI.
+    let sent = start
+    const pump = () => {
+      if (sent >= size) return res.end()
+      const end = Math.min(sent + 256 * 1024, size)
+      res.write(fileChunk(item.Id, sent, end))
+      sent = end
+      setTimeout(pump, CHUNK_DELAY_MS)
+    }
+    return pump()
+  }
+
+  if (episodesMatch) {
+    const eps = episodes.filter((e) => e.SeriesId === episodesMatch[1])
+    return send(200, { Items: eps, TotalRecordCount: eps.length })
+  }
+
+  if (url.pathname === '/Library/Refresh') {
+    console.log('mock: /Library/Refresh called')
+    res.writeHead(204)
+    return res.end()
+  }
 
   if (url.pathname === '/System/Info') {
     return send(200, { ServerName: 'Mock Primary', Version: '10.10.0', Id: 'mock-server-1' })

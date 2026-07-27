@@ -17,6 +17,10 @@
   let primary = $state<ServerForm>(emptyForm())
   let mobile = $state<ServerForm>(emptyForm())
   let primaryUserId = $state('')
+  let moviesDir = $state('')
+  let showsDir = $state('')
+  let pathsSaving = $state(false)
+  let pathsSaved = $state(false)
   let loading = $state(true)
   let loadError = $state('')
 
@@ -29,6 +33,8 @@
         primaryUserId = s['primary.userId'] ?? ''
         mobile.url = s['mobile.url'] ?? ''
         mobile.apiKey = s['mobile.apiKey'] ?? ''
+        moviesDir = s['mobile.moviesDir'] ?? ''
+        showsDir = s['mobile.showsDir'] ?? ''
         loading = false
       })
       .catch((e) => {
@@ -61,6 +67,20 @@
       primary.saved = true
     } finally {
       primary.saving = false
+    }
+  }
+
+  async function savePaths() {
+    pathsSaving = true
+    pathsSaved = false
+    try {
+      await api.saveSettings({
+        'mobile.moviesDir': moviesDir.trim() || null,
+        'mobile.showsDir': showsDir.trim() || null,
+      })
+      pathsSaved = true
+    } finally {
+      pathsSaving = false
     }
   }
 
@@ -171,6 +191,28 @@
           {mobile.saving ? 'Saving…' : 'Save mobile'}
         </button>
         {#if mobile.saved}<span class="ok-text">Saved ✓</span>{/if}
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Library paths <span class="muted">(where checkouts land)</span></h2>
+      <p class="muted">
+        Folders on <em>this</em> machine that the mobile Jellyfin watches. Checked-out media is
+        placed here with Jellyfin naming (<code>Title (Year)/…</code>, <code>Show/Season 01/…</code>).
+      </p>
+      <label>
+        Movies folder
+        <input type="text" bind:value={moviesDir} placeholder="/media/movies" />
+      </label>
+      <label>
+        Shows folder
+        <input type="text" bind:value={showsDir} placeholder="/media/shows" />
+      </label>
+      <div class="row">
+        <button class="primary" onclick={savePaths} disabled={pathsSaving}>
+          {pathsSaving ? 'Saving…' : 'Save paths'}
+        </button>
+        {#if pathsSaved}<span class="ok-text">Saved ✓</span>{/if}
       </div>
     </section>
   </div>

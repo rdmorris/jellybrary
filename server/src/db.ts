@@ -11,7 +11,36 @@ db.exec(`
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS checkouts (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    item_id     TEXT NOT NULL UNIQUE,
+    kind        TEXT NOT NULL,             -- 'Movie' | 'Episode'
+    title       TEXT NOT NULL,
+    year        INTEGER,
+    series_name TEXT,
+    season      INTEGER,
+    episode     INTEGER,
+    profile     TEXT NOT NULL DEFAULT 'original',
+    status      TEXT NOT NULL DEFAULT 'queued',  -- queued | transferring | on_device | error
+    bytes_total INTEGER NOT NULL DEFAULT 0,
+    bytes_done  INTEGER NOT NULL DEFAULT 0,
+    source_name TEXT,                      -- original filename on the primary
+    local_path  TEXT,
+    error       TEXT,
+    retries     INTEGER NOT NULL DEFAULT 0,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  );
 `)
+
+// Lightweight migrations: add columns that older databases lack.
+const checkoutCols = new Set(
+  (db.prepare(`PRAGMA table_info(checkouts)`).all() as unknown as { name: string }[]).map((c) => c.name),
+)
+if (!checkoutCols.has('next_retry_at')) {
+  db.exec(`ALTER TABLE checkouts ADD COLUMN next_retry_at INTEGER`) // ms epoch; NULL = ready now
+}
 
 const getStmt = db.prepare('SELECT value FROM settings WHERE key = ?')
 const setStmt = db.prepare(

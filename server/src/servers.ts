@@ -10,7 +10,22 @@ export const SETTING_KEYS = [
   'primary.userId',
   'mobile.url',
   'mobile.apiKey',
+  'mobile.moviesDir',
+  'mobile.showsDir',
+  'transfer.concurrency',
 ] as const
+
+export function libraryDirs() {
+  return {
+    moviesDir: getSetting('mobile.moviesDir'),
+    showsDir: getSetting('mobile.showsDir'),
+  }
+}
+
+export function transferConcurrency(): number {
+  const n = Number(getSetting('transfer.concurrency') ?? 2)
+  return Number.isFinite(n) && n >= 1 ? Math.min(n, 8) : 2
+}
 
 export function serverConfig(key: ServerKey) {
   return {

@@ -4,6 +4,8 @@ import { existsSync } from 'node:fs'
 import { HOST, PORT, WEB_DIST } from './config.ts'
 import { settingsRoutes } from './routes/settings.ts'
 import { browseRoutes } from './routes/browse.ts'
+import { transferRoutes } from './routes/transfers.ts'
+import { startWorker } from './worker.ts'
 
 const app = Fastify({ logger: { level: 'info' } })
 
@@ -11,6 +13,9 @@ app.get('/api/health', async () => ({ ok: true, name: 'cloud-clone', version: '0
 
 settingsRoutes(app)
 browseRoutes(app)
+transferRoutes(app)
+
+startWorker((msg) => app.log.info(msg))
 
 // In production the built Svelte app is served from web/dist; in dev, Vite serves it.
 if (existsSync(WEB_DIST)) {

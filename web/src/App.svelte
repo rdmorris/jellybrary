@@ -1,6 +1,8 @@
 <script lang="ts">
   import Browse from './pages/Browse.svelte'
+  import OnDevice from './pages/OnDevice.svelte'
   import Settings from './pages/Settings.svelte'
+  import Transfers from './pages/Transfers.svelte'
 
   type Page = 'browse' | 'transfers' | 'device' | 'settings'
 
@@ -17,10 +19,10 @@
     return () => window.removeEventListener('hashchange', onHash)
   })
 
-  const tabs: { id: Page; label: string; soon?: boolean }[] = [
+  const tabs: { id: Page; label: string }[] = [
     { id: 'browse', label: 'Browse' },
-    { id: 'transfers', label: 'Transfers', soon: true },
-    { id: 'device', label: 'On Device', soon: true },
+    { id: 'transfers', label: 'Transfers' },
+    { id: 'device', label: 'On Device' },
     { id: 'settings', label: 'Settings' },
   ]
 </script>
@@ -32,10 +34,7 @@
   </a>
   <nav>
     {#each tabs as tab (tab.id)}
-      <a href={`#/${tab.id}`} class:active={page === tab.id} class:soon={tab.soon}>
-        {tab.label}
-        {#if tab.soon}<small>soon</small>{/if}
-      </a>
+      <a href={`#/${tab.id}`} class:active={page === tab.id}>{tab.label}</a>
     {/each}
   </nav>
 </header>
@@ -43,13 +42,12 @@
 <main>
   {#if page === 'browse'}
     <Browse />
-  {:else if page === 'settings'}
-    <Settings />
+  {:else if page === 'transfers'}
+    <Transfers />
+  {:else if page === 'device'}
+    <OnDevice />
   {:else}
-    <div class="card placeholder">
-      <h2>{page === 'transfers' ? 'Transfers' : 'On Device'}</h2>
-      <p class="muted">Coming in milestone 2 — checkout queue, transfer progress, and returns.</p>
-    </div>
+    <Settings />
   {/if}
 </main>
 
@@ -98,26 +96,9 @@
     background: var(--bg-hover);
   }
 
-  nav a.soon {
-    opacity: 0.6;
-  }
-
-  nav a small {
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-left: 4px;
-    color: var(--accent);
-  }
-
   main {
     max-width: 1280px;
     margin: 0 auto;
     padding: 24px;
-  }
-
-  .placeholder {
-    text-align: center;
-    padding: 60px 20px;
   }
 </style>
