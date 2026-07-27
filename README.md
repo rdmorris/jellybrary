@@ -7,6 +7,9 @@ when done. See [PLAN.md](PLAN.md) for the full design.
 *Jellybrary is a community project, not affiliated with or endorsed by the
 [Jellyfin](https://jellyfin.org) project.*
 
+![Browsing the primary library in Jellybrary](docs/screenshot-browse.png)
+*(shown with the bundled mock library — your real posters appear with a real server)*
+
 **Status: milestone 2** — browse the primary library, check out movies or whole series,
 watch transfers with progress/resume, and return items to free space. Set the
 **Library paths** in Settings so checkouts know where to land. Transcode profiles come
