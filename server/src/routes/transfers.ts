@@ -12,10 +12,11 @@ import {
   type NewCheckout,
 } from '../checkouts.ts'
 import type { JellyfinItem } from '../jellyfin.ts'
+import { TRANSCODE_PROFILES, estimateBytes, isValidProfile } from '../profiles.ts'
 import { client, libraryDirs, primaryContext } from '../servers.ts'
 import { abortTransfer, partialPath, wake } from '../worker.ts'
 
-function toNewCheckout(item: JellyfinItem): NewCheckout {
+function toNewCheckout(item: JellyfinItem, profile: string): NewCheckout {
   const source = item.MediaSources?.[0]
   return {
     item_id: item.Id,
@@ -25,25 +26,31 @@ function toNewCheckout(item: JellyfinItem): NewCheckout {
     series_name: item.SeriesName ?? null,
     season: item.ParentIndexNumber ?? null,
     episode: item.IndexNumber ?? null,
-    bytes_total: source?.Size ?? 0,
+    profile,
+    bytes_total:
+      profile === 'original' ? source?.Size ?? 0 : estimateBytes(profile, item.RunTimeTicks),
     source_name: item.Path ? path.basename(item.Path) : source?.Path ? path.basename(source.Path) : null,
   }
 }
 
 export function transferRoutes(app: FastifyInstance) {
+  app.get('/api/profiles', async () => TRANSCODE_PROFILES)
+
   // Queue a checkout. Movies/episodes queue directly; series/seasons expand to episodes.
-  app.post<{ Body: { itemId?: string } }>('/api/checkouts', async (req, reply) => {
+  app.post<{ Body: { itemId?: string; profile?: string } }>('/api/checkouts', async (req, reply) => {
     const ctx = primaryContext()
     if (!ctx) return reply.code(409).send({ error: 'not_configured' })
     const itemId = req.body?.itemId
     if (!itemId) return reply.code(400).send({ error: 'itemId required' })
+    const profile = req.body?.profile ?? 'original'
+    if (!isValidProfile(profile)) return reply.code(400).send({ error: `unknown profile: ${profile}` })
 
     const item = await ctx.client.item(ctx.userId, itemId)
     let queued = 0
     let skipped = 0
 
     if (item.Type === 'Movie' || item.Type === 'Episode') {
-      addCheckout(toNewCheckout(item)) ? queued++ : skipped++
+      addCheckout(toNewCheckout(item, profile)) ? queued++ : skipped++
     } else if (item.Type === 'Series' || item.Type === 'Season') {
       const seriesId = item.Type === 'Season' ? (item as { SeriesId?: string }).SeriesId ?? itemId : itemId
       const eps = await ctx.client.episodes(ctx.userId, seriesId)
@@ -54,7 +61,7 @@ export function transferRoutes(app: FastifyInstance) {
       for (const ep of wanted) {
         // Skip specials/virtual items with no file behind them.
         if (!ep.Path && !ep.MediaSources?.[0]?.Path) continue
-        addCheckout(toNewCheckout(ep)) ? queued++ : skipped++
+        addCheckout(toNewCheckout(ep, profile)) ? queued++ : skipped++
       }
     } else {
       return reply.code(400).send({ error: `cannot check out item type ${item.Type}` })

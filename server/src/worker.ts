@@ -7,6 +7,7 @@ import { Readable } from 'node:stream'
 import path from 'node:path'
 import { DATA_DIR } from './config.ts'
 import { getCheckout, nextQueued, updateCheckout, type CheckoutRow } from './checkouts.ts'
+import { TRANSCODE_PROFILES } from './profiles.ts'
 import { client, libraryDirs, primaryContext, transferConcurrency } from './servers.ts'
 
 const TICK_MS = 2000
@@ -36,7 +37,9 @@ function sanitize(name: string): string {
 /** Destination path following Jellyfin naming conventions. */
 export function destinationFor(row: CheckoutRow): string | null {
   const { moviesDir, showsDir } = libraryDirs()
-  const fname = row.source_name ?? `${sanitize(row.title)}.mkv`
+  let fname = row.source_name ?? `${sanitize(row.title)}.mkv`
+  // Transcodes are always remuxed into mkv, whatever the source container was.
+  if (row.profile !== 'original') fname = fname.replace(/\.[^.]+$/, '') + '.mkv'
   if (row.kind === 'Movie') {
     if (!moviesDir) return null
     const folder = row.year ? `${sanitize(row.title)} (${row.year})` : sanitize(row.title)
@@ -63,21 +66,32 @@ async function transfer(row: CheckoutRow, log: (msg: string) => void): Promise<v
 
   await mkdir(PARTIAL_DIR, { recursive: true })
   const partial = partialPath(row.id)
-  const offset = await fileSizeOrZero(partial)
+  const transcode = row.profile !== 'original' ? TRANSCODE_PROFILES[row.profile] : undefined
+  if (row.profile !== 'original' && !transcode) throw new Error(`Unknown profile: ${row.profile}`)
 
-  const res = await ctx.client.download(row.item_id, offset)
+  // Transcode streams are live encodes — no Range support, always start from zero.
+  const offset = transcode ? 0 : await fileSizeOrZero(partial)
+
+  const res = transcode
+    ? await ctx.client.transcodeStream(row.item_id, transcode)
+    : await ctx.client.download(row.item_id, offset)
   const resumed = res.status === 206
   const totalHeader = res.headers.get(resumed ? 'content-range' : 'content-length')
-  const total = resumed
-    ? Number(totalHeader?.split('/')[1] ?? 0)
-    : Number(totalHeader ?? 0) + (res.status === 200 ? 0 : offset)
+  // Transcodes are chunked with no length; keep the estimate stored at checkout time.
+  const total = transcode
+    ? row.bytes_total
+    : resumed
+      ? Number(totalHeader?.split('/')[1] ?? 0)
+      : Number(totalHeader ?? 0)
   updateCheckout(row.id, {
     status: 'transferring',
     bytes_total: total || row.bytes_total,
     bytes_done: resumed ? offset : 0,
     error: null,
   })
-  log(`transfer #${row.id} ${row.title}: ${resumed ? `resuming at ${offset}` : 'starting'}`)
+  log(
+    `transfer #${row.id} ${row.title}: ${resumed ? `resuming at ${offset}` : 'starting'}${transcode ? ` (${row.profile} transcode)` : ''}`,
+  )
 
   const ac = new AbortController()
   aborters.set(row.id, ac)
@@ -108,14 +122,21 @@ async function transfer(row: CheckoutRow, log: (msg: string) => void): Promise<v
     aborters.delete(row.id)
   }
 
-  if (total > 0) {
+  // Originals have a known size to verify; transcodes only had an estimate, so the
+  // final byte count becomes the recorded size instead.
+  if (!transcode && total > 0) {
     const actual = await fileSizeOrZero(partial)
     if (actual !== total) throw new Error(`Size mismatch: got ${actual}, expected ${total}`)
   }
 
   await mkdir(path.dirname(dest), { recursive: true })
   await rename(partial, dest)
-  updateCheckout(row.id, { status: 'on_device', bytes_done: done, bytes_total: total || done, local_path: dest })
+  updateCheckout(row.id, {
+    status: 'on_device',
+    bytes_done: done,
+    bytes_total: transcode ? done : total || done,
+    local_path: dest,
+  })
   log(`transfer #${row.id} ${row.title}: done → ${dest}`)
 
   // Best-effort: ask the mobile Jellyfin to pick up the new file.

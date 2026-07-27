@@ -30,13 +30,14 @@ export interface NewCheckout {
   series_name?: string | null
   season?: number | null
   episode?: number | null
+  profile?: string
   bytes_total?: number
   source_name?: string | null
 }
 
 const insertStmt = db.prepare(`
-  INSERT INTO checkouts (item_id, kind, title, year, series_name, season, episode, bytes_total, source_name)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  INSERT INTO checkouts (item_id, kind, title, year, series_name, season, episode, profile, bytes_total, source_name)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   ON CONFLICT(item_id) DO NOTHING
 `)
 
@@ -49,6 +50,7 @@ export function addCheckout(c: NewCheckout): boolean {
     c.series_name ?? null,
     c.season ?? null,
     c.episode ?? null,
+    c.profile ?? 'original',
     c.bytes_total ?? 0,
     c.source_name ?? null,
   )

@@ -144,6 +144,24 @@ const server = http.createServer((req, res) => {
   const itemMatch = url.pathname.match(/^\/Users\/[^/]+\/Items\/([^/]+)$/)
   const downloadMatch = url.pathname.match(/^\/Items\/([^/]+)\/Download$/)
   const episodesMatch = url.pathname.match(/^\/Shows\/([^/]+)\/Episodes$/)
+  const transcodeMatch = url.pathname.match(/^\/Videos\/([^/]+)\/stream(\.\w+)?$/)
+
+  if (transcodeMatch) {
+    const item = all.find((i) => i.Id === transcodeMatch[1])
+    if (!item) return send(404, { error: 'not found' })
+    // "Transcode": ~35% of original size, chunked (no content-length), like real Jellyfin.
+    const size = Math.floor(item.MediaSources[0].Size * 0.35)
+    res.writeHead(200, { 'content-type': 'video/x-matroska', 'transfer-encoding': 'chunked' })
+    let sent = 0
+    const pump = () => {
+      if (sent >= size) return res.end()
+      const end = Math.min(sent + 256 * 1024, size)
+      res.write(fileChunk(`${item.Id}-transcode`, sent, end))
+      sent = end
+      setTimeout(pump, CHUNK_DELAY_MS)
+    }
+    return pump()
+  }
 
   if (downloadMatch) {
     const item = all.find((i) => i.Id === downloadMatch[1])

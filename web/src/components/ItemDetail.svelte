@@ -1,5 +1,14 @@
 <script lang="ts">
-  import { api, fileSize, imageUrl, runtime, type JellyfinItem } from '../lib/api'
+  import {
+    api,
+    estimateBytes,
+    fileSize,
+    formatBytes,
+    imageUrl,
+    runtime,
+    type JellyfinItem,
+    type TranscodeProfile,
+  } from '../lib/api'
 
   let { item, onclose }: { item: JellyfinItem; onclose: () => void } = $props()
 
@@ -7,12 +16,27 @@
 
   let working = $state(false)
   let result = $state('')
+  let profiles = $state<Record<string, TranscodeProfile>>({})
+  let profile = $state('original')
+
+  $effect(() => {
+    api.profiles().then((p) => (profiles = p)).catch(() => {})
+  })
+
+  function optionLabel(name: string, spec?: TranscodeProfile): string {
+    if (!spec) {
+      const size = fileSize(item)
+      return `Original${size ? ` (${size})` : ''}`
+    }
+    const est = estimateBytes(spec, item.RunTimeTicks)
+    return `${spec.label}${est ? ` (~${formatBytes(est)})` : ''}`
+  }
 
   async function checkOut() {
     working = true
     result = ''
     try {
-      const res = await api.checkOut(item.Id)
+      const res = await api.checkOut(item.Id, profile)
       if (res.queued === 0 && res.skipped > 0) result = 'Already checked out'
       else if (res.skipped > 0) result = `Queued ${res.queued} (${res.skipped} already on device)`
       else result = res.queued === 1 ? 'Queued ✓' : `Queued ${res.queued} episodes ✓`
@@ -60,6 +84,12 @@
           <p class="overview">{item.Overview}</p>
         {/if}
         <div class="actions">
+          <select class="profile" bind:value={profile} title="Quality — transcodes run on the primary server">
+            <option value="original">{optionLabel('original')}</option>
+            {#each Object.entries(profiles) as [name, spec] (name)}
+              <option value={name}>{optionLabel(name, spec)}</option>
+            {/each}
+          </select>
           <button class="primary" disabled={working} onclick={checkOut}>
             {working ? 'Queuing…' : item.Type === 'Series' ? '⬇ Check out series' : '⬇ Check out'}
           </button>
@@ -67,6 +97,9 @@
             <span class={result.startsWith('Failed') ? 'error-text' : 'ok-text'}>{result}</span>
           {/if}
         </div>
+        {#if profile !== 'original'}
+          <p class="muted"><small>Transcoded by the primary server{item.Type === 'Series' ? '; estimates vary per episode' : ''}. Not resumable — interrupted transfers restart.</small></p>
+        {/if}
         {#if item.Type === 'Series'}
           <p class="muted"><small>Queues every episode. Season/episode selection is coming later.</small></p>
         {/if}
@@ -146,6 +179,11 @@
     align-items: center;
     gap: 12px;
     margin-top: 18px;
+    flex-wrap: wrap;
+  }
+
+  .profile {
+    width: auto;
   }
 
   @media (max-width: 560px) {

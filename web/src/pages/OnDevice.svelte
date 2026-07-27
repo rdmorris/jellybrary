@@ -73,7 +73,9 @@
           <div class="card row">
             <div class="info">
               <div class="title">{c.title}{c.year ? ` (${c.year})` : ''}</div>
-              <div class="sub muted">{formatBytes(c.bytes_total)} · {c.local_path}</div>
+              <div class="sub muted">
+                {formatBytes(c.bytes_total)}{c.profile !== 'original' ? ` · ${c.profile}` : ''} · {c.local_path}
+              </div>
             </div>
             <button disabled={returning.has(c.id)} onclick={() => giveBack([c.id])}>
               {returning.has(c.id) ? 'Returning…' : 'Return'}

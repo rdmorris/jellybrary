@@ -10,10 +10,16 @@ when done. See [PLAN.md](PLAN.md) for the full design.
 ![Browsing the primary library in Jellybrary](docs/screenshot-browse.png)
 *(shown with the bundled mock library — your real posters appear with a real server)*
 
-**Status: milestone 2** — browse the primary library, check out movies or whole series,
-watch transfers with progress/resume, and return items to free space. Set the
-**Library paths** in Settings so checkouts know where to land. Transcode profiles come
-in milestone 3; watch-state sync in milestone 4.
+**Status: milestone 3** — browse the primary library, check out movies or whole series
+at **original quality or as a 1080p/720p HEVC transcode** (with size estimates), watch
+transfers with progress/resume, and return items to free space. Set the **Library
+paths** in Settings so checkouts know where to land. Watch-state sync comes in
+milestone 4.
+
+Transcodes are performed by the *primary* Jellyfin server via its stream API, using
+whatever hardware acceleration it has configured (Dashboard → Playback). Enable
+"Allow encoding in HEVC format" there, or Jellyfin will fall back to H.264. Transcode
+transfers are not resumable — an interrupted one restarts from zero.
 
 ## Requirements
 

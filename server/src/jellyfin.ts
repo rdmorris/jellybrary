@@ -169,6 +169,37 @@ export class JellyfinClient {
     return res
   }
 
+  /**
+   * Server-side transcode stream (HEVC/AAC in mkv). The primary does the encoding —
+   * with its hardware acceleration, if configured. Chunked response, no Content-Length,
+   * NOT resumable: a broken transfer starts over.
+   */
+  async transcodeStream(
+    itemId: string,
+    spec: { maxHeight: number; videoBitRate: number; audioBitRate: number },
+  ): Promise<Response> {
+    const url = new URL(`${this.baseUrl}/Videos/${itemId}/stream.mkv`)
+    const params: Record<string, string> = {
+      static: 'false',
+      mediaSourceId: itemId,
+      deviceId: 'jellybrary',
+      videoCodec: 'hevc',
+      audioCodec: 'aac',
+      maxHeight: String(spec.maxHeight),
+      videoBitRate: String(spec.videoBitRate),
+      audioBitRate: String(spec.audioBitRate),
+    }
+    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v)
+    let res: Response
+    try {
+      res = await fetch(url, { headers: this.headers() })
+    } catch (err) {
+      throw new JellyfinError(`Cannot reach Jellyfin at ${this.baseUrl}: ${(err as Error).message}`)
+    }
+    if (!res.ok) throw new JellyfinError(`Transcode failed with ${res.status} for item ${itemId}`, res.status)
+    return res
+  }
+
   /** Ask the server to rescan its libraries (used on the mobile Jellyfin after placement). */
   async refreshLibrary(): Promise<void> {
     await this.request('/Library/Refresh', undefined, { method: 'POST' })

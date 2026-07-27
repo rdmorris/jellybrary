@@ -88,11 +88,12 @@
         <div class="info">
           <div class="title">{label(c)}</div>
           <div class="sub muted">
+            {#if c.profile !== 'original'}<span class="chip">{c.profile}</span>{/if}
             {#if c.status === 'transferring'}
-              {formatBytes(c.bytes_done)} of {formatBytes(c.bytes_total)}
+              {formatBytes(c.bytes_done)} of {c.profile !== 'original' ? '~' : ''}{formatBytes(c.bytes_total)}
               {#if speeds[c.id]}· {formatBytes(speeds[c.id])}/s · {eta(c)}{/if}
             {:else if c.status === 'queued'}
-              Queued{c.bytes_total ? ` · ${formatBytes(c.bytes_total)}` : ''}
+              Queued{c.bytes_total ? ` · ${c.profile !== 'original' ? '~' : ''}${formatBytes(c.bytes_total)}` : ''}
               {#if c.error}<span class="error-text"> · retrying after: {c.error}</span>{/if}
             {:else if c.status === 'error'}
               <span class="error-text">Failed: {c.error}</span>
@@ -142,6 +143,18 @@
   .sub {
     font-size: 13px;
     margin: 2px 0 8px;
+  }
+
+  .chip {
+    display: inline-block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--accent);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0 8px;
+    margin-right: 6px;
   }
 
   .bar {

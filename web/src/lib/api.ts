@@ -73,6 +73,18 @@ export interface DeviceSpace {
   totalBytes?: number
 }
 
+export interface TranscodeProfile {
+  label: string
+  maxHeight: number
+  videoBitRate: number
+  audioBitRate: number
+}
+
+export function estimateBytes(spec: TranscodeProfile, runTimeTicks?: number): number {
+  if (!runTimeTicks) return 0
+  return Math.round(((spec.videoBitRate + spec.audioBitRate) / 8) * (runTimeTicks / 10_000_000))
+}
+
 export class ApiError extends Error {
   code: string
 
@@ -107,7 +119,9 @@ export const api = {
     return req<ItemsResult>('GET', `/api/browse/items?${qs}`)
   },
   item: (id: string) => req<JellyfinItem>('GET', `/api/browse/items/${id}`),
-  checkOut: (itemId: string) => req<{ queued: number; skipped: number }>('POST', '/api/checkouts', { itemId }),
+  profiles: () => req<Record<string, TranscodeProfile>>('GET', '/api/profiles'),
+  checkOut: (itemId: string, profile = 'original') =>
+    req<{ queued: number; skipped: number }>('POST', '/api/checkouts', { itemId, profile }),
   checkouts: () => req<CheckoutsResult>('GET', '/api/checkouts'),
   cancelCheckout: (id: number) => req<{ ok: true }>('DELETE', `/api/checkouts/${id}`),
   retryCheckout: (id: number) => req<{ ok: true }>('POST', `/api/checkouts/${id}/retry`),
