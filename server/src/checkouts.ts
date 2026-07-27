@@ -18,6 +18,11 @@ export interface CheckoutRow {
   error: string | null
   retries: number
   next_retry_at: number | null
+  provider_ids: string | null
+  mobile_played: number
+  mobile_position: number
+  synced_played: number
+  synced_position: number
   created_at: string
   updated_at: string
 }
@@ -33,11 +38,12 @@ export interface NewCheckout {
   profile?: string
   bytes_total?: number
   source_name?: string | null
+  provider_ids?: string | null
 }
 
 const insertStmt = db.prepare(`
-  INSERT INTO checkouts (item_id, kind, title, year, series_name, season, episode, profile, bytes_total, source_name)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  INSERT INTO checkouts (item_id, kind, title, year, series_name, season, episode, profile, bytes_total, source_name, provider_ids)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   ON CONFLICT(item_id) DO NOTHING
 `)
 
@@ -53,6 +59,7 @@ export function addCheckout(c: NewCheckout): boolean {
     c.profile ?? 'original',
     c.bytes_total ?? 0,
     c.source_name ?? null,
+    c.provider_ids ?? null,
   )
   return res.changes > 0
 }

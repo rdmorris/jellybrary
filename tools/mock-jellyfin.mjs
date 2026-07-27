@@ -99,6 +99,19 @@ const views = [
 
 const all = [...movies, ...series, ...episodes]
 
+// Mutable per-item watch state (single-user mock; ignores the user id).
+const userData = new Map() // itemId → { Played, PlaybackPositionTicks }
+function withUserData(item) {
+  const ud = userData.get(item.Id)
+  return ud ? { ...item, UserData: { ...item.UserData, ...ud } } : item
+}
+
+// Episodes inherit their series' provider IDs (like real TVDB-scraped libraries),
+// plus an episode-unique one.
+for (const ep of episodes) {
+  ep.ProviderIds = { Tvdb: String(200000 + Number(ep.SeriesId.split('-')[1])), TvdbEp: ep.Id }
+}
+
 // Deterministic pseudo-random content so resumed downloads produce identical bytes.
 function fileChunk(itemId, start, end) {
   const buf = Buffer.alloc(end - start)
@@ -142,6 +155,28 @@ const server = http.createServer((req, res) => {
 
   const imageMatch = url.pathname.match(/^\/Items\/([^/]+)\/Images\//)
   const itemMatch = url.pathname.match(/^\/Users\/[^/]+\/Items\/([^/]+)$/)
+  const playedMatch = url.pathname.match(/^\/Users\/[^/]+\/PlayedItems\/([^/]+)$/)
+  const userDataMatch = url.pathname.match(/^\/Users\/[^/]+\/Items\/([^/]+)\/UserData$/)
+
+  if (playedMatch && (req.method === 'POST' || req.method === 'DELETE')) {
+    const prev = userData.get(playedMatch[1]) ?? {}
+    userData.set(playedMatch[1], { ...prev, Played: req.method === 'POST' })
+    console.log(`mock: ${req.method === 'POST' ? 'marked played' : 'unmarked'} ${playedMatch[1]}`)
+    return send(200, { Played: req.method === 'POST' })
+  }
+
+  if (userDataMatch && req.method === 'POST') {
+    let body = ''
+    req.on('data', (c) => (body += c))
+    req.on('end', () => {
+      const patch = JSON.parse(body || '{}')
+      const prev = userData.get(userDataMatch[1]) ?? {}
+      userData.set(userDataMatch[1], { ...prev, ...patch })
+      console.log(`mock: userdata ${userDataMatch[1]}`, patch)
+      send(200, userData.get(userDataMatch[1]))
+    })
+    return
+  }
   const downloadMatch = url.pathname.match(/^\/Items\/([^/]+)\/Download$/)
   const episodesMatch = url.pathname.match(/^\/Shows\/([^/]+)\/Episodes$/)
   const transcodeMatch = url.pathname.match(/^\/Videos\/([^/]+)\/stream(\.\w+)?$/)
@@ -188,7 +223,7 @@ const server = http.createServer((req, res) => {
   }
 
   if (episodesMatch) {
-    const eps = episodes.filter((e) => e.SeriesId === episodesMatch[1])
+    const eps = episodes.filter((e) => e.SeriesId === episodesMatch[1]).map(withUserData)
     return send(200, { Items: eps, TotalRecordCount: eps.length })
   }
 
@@ -215,18 +250,25 @@ const server = http.createServer((req, res) => {
     const parentId = q.get('parentId')
     if (parentId === 'lib-movies') items = movies
     else if (parentId === 'lib-shows') items = series
+    const providers = q.get('anyProviderIdEquals')
+    if (providers) {
+      const wanted = providers.split(',').map((p) => p.toLowerCase())
+      items = items.filter((i) =>
+        Object.entries(i.ProviderIds ?? {}).some(([k, v]) => wanted.includes(`${k.toLowerCase()}.${v}`)),
+      )
+    }
     const types = q.get('includeItemTypes')
     if (types) items = items.filter((i) => types.split(',').includes(i.Type))
     const term = q.get('searchTerm')?.toLowerCase()
-    if (term) items = items.filter((i) => i.Name.toLowerCase().includes(term))
+    if (term) items = items.filter((i) => i.Name.toLowerCase().includes(term) || i.SeriesName?.toLowerCase().includes(term))
     items = [...items].sort((a, b) => a.Name.localeCompare(b.Name))
     const start = Number(q.get('startIndex') ?? 0)
     const limit = Number(q.get('limit') ?? 60)
-    return send(200, { Items: items.slice(start, start + limit), TotalRecordCount: items.length })
+    return send(200, { Items: items.slice(start, start + limit).map(withUserData), TotalRecordCount: items.length })
   }
   if (itemMatch) {
     const item = all.find((i) => i.Id === itemMatch[1])
-    return item ? send(200, item) : send(404, { error: 'not found' })
+    return item ? send(200, withUserData(item)) : send(404, { error: 'not found' })
   }
   if (imageMatch) {
     const item = all.find((i) => i.Id === imageMatch[1])

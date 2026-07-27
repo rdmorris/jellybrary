@@ -5,6 +5,7 @@ import { HOST, PORT, WEB_DIST } from './config.ts'
 import { settingsRoutes } from './routes/settings.ts'
 import { browseRoutes } from './routes/browse.ts'
 import { transferRoutes } from './routes/transfers.ts'
+import { startSyncLoop } from './sync.ts'
 import { startWorker } from './worker.ts'
 
 const app = Fastify({ logger: { level: 'info' } })
@@ -16,6 +17,7 @@ browseRoutes(app)
 transferRoutes(app)
 
 startWorker((msg) => app.log.info(msg))
+startSyncLoop((msg) => app.log.info(msg))
 
 // In production the built Svelte app is served from web/dist; in dev, Vite serves it.
 if (existsSync(WEB_DIST)) {

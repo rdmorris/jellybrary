@@ -10,9 +10,11 @@ export const SETTING_KEYS = [
   'primary.userId',
   'mobile.url',
   'mobile.apiKey',
+  'mobile.userId',
   'mobile.moviesDir',
   'mobile.showsDir',
   'transfer.concurrency',
+  'transfer.minFreeGB',
 ] as const
 
 export function libraryDirs() {
@@ -46,4 +48,15 @@ export function primaryContext(): { client: JellyfinClient; userId: string } | n
   const cfg = serverConfig('primary')
   if (!cfg.url || !cfg.apiKey || !cfg.userId) return null
   return { client: new JellyfinClient(cfg.url, cfg.apiKey), userId: cfg.userId }
+}
+
+export function mobileContext(): { client: JellyfinClient; userId: string } | null {
+  const cfg = serverConfig('mobile')
+  if (!cfg.url || !cfg.apiKey || !cfg.userId) return null
+  return { client: new JellyfinClient(cfg.url, cfg.apiKey), userId: cfg.userId }
+}
+
+export function minFreeBytes(): number {
+  const gb = Number(getSetting('transfer.minFreeGB') ?? 2)
+  return (Number.isFinite(gb) && gb >= 0 ? gb : 2) * 1024 ** 3
 }

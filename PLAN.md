@@ -90,13 +90,16 @@ before you commit to a big checkout.
 
 ## Milestones
 
-1. **Skeleton + browse** — monorepo layout, config, connect to both Jellyfin servers
+1. ✅ **Skeleton + browse** — monorepo layout, config, connect to both Jellyfin servers
    with API keys, Browse UI over the primary library. *Proves the API integration.*
-2. **Checkout + transfer (originals)** — queue, resumable downloads, correct library
+2. ✅ **Checkout + transfer (originals)** — queue, resumable downloads, correct library
    placement, mobile rescan, Return. *This is the usable MVP.*
-3. **Transcode profiles** — profile picker, stream-transcode transfers, size estimates.
-4. **Watch-state sync + polish** — reconciliation on reconnect, next-N-unwatched
+3. ✅ **Transcode profiles** — profile picker, stream-transcode transfers, size estimates.
+4. ✅ **Watch-state sync + polish** — reconciliation on reconnect, next-N-unwatched
    checkout, disk-space guard, "return all watched".
+
+All four shipped 2026-07-26. Post-v0.1 ideas: web UI auth, checkout badges in Browse,
+transfer scheduling/bandwidth limits, multi-select checkout.
 
 ## Distribution
 

@@ -17,8 +17,10 @@
   let primary = $state<ServerForm>(emptyForm())
   let mobile = $state<ServerForm>(emptyForm())
   let primaryUserId = $state('')
+  let mobileUserId = $state('')
   let moviesDir = $state('')
   let showsDir = $state('')
+  let minFreeGB = $state('2')
   let pathsSaving = $state(false)
   let pathsSaved = $state(false)
   let loading = $state(true)
@@ -33,8 +35,10 @@
         primaryUserId = s['primary.userId'] ?? ''
         mobile.url = s['mobile.url'] ?? ''
         mobile.apiKey = s['mobile.apiKey'] ?? ''
+        mobileUserId = s['mobile.userId'] ?? ''
         moviesDir = s['mobile.moviesDir'] ?? ''
         showsDir = s['mobile.showsDir'] ?? ''
+        minFreeGB = s['transfer.minFreeGB'] ?? '2'
         loading = false
       })
       .catch((e) => {
@@ -77,6 +81,7 @@
       await api.saveSettings({
         'mobile.moviesDir': moviesDir.trim() || null,
         'mobile.showsDir': showsDir.trim() || null,
+        'transfer.minFreeGB': minFreeGB.trim() || null,
       })
       pathsSaved = true
     } finally {
@@ -91,6 +96,7 @@
       await api.saveSettings({
         'mobile.url': mobile.url.trim() || null,
         'mobile.apiKey': mobile.apiKey.trim() || null,
+        'mobile.userId': mobileUserId || null,
       })
       mobile.saved = true
     } finally {
@@ -186,6 +192,18 @@
         {/if}
       </div>
 
+      {#if mobile.test?.ok && mobile.test.users?.length}
+        <label>
+          Watch-state user <span class="muted">(whose viewing gets synced home)</span>
+          <select bind:value={mobileUserId}>
+            <option value="">Not set — skip watch-state sync</option>
+            {#each mobile.test.users as u (u.id)}
+              <option value={u.id}>{u.name}{u.admin ? ' (admin)' : ''}</option>
+            {/each}
+          </select>
+        </label>
+      {/if}
+
       <div class="row">
         <button class="primary" onclick={saveMobile} disabled={mobile.saving}>
           {mobile.saving ? 'Saving…' : 'Save mobile'}
@@ -207,6 +225,10 @@
       <label>
         Shows folder
         <input type="text" bind:value={showsDir} placeholder="/media/shows" />
+      </label>
+      <label>
+        Keep at least this much disk free (GB)
+        <input type="number" min="0" bind:value={minFreeGB} placeholder="2" />
       </label>
       <div class="row">
         <button class="primary" onclick={savePaths} disabled={pathsSaving}>

@@ -1,14 +1,14 @@
 // Transfer worker: pulls queued checkouts from the primary Jellyfin and places them
 // in the mobile library. Resumes partial downloads via HTTP Range. Runs forever.
 import { createWriteStream } from 'node:fs'
-import { mkdir, rename, rm, stat } from 'node:fs/promises'
+import { mkdir, rename, rm, stat, statfs } from 'node:fs/promises'
 import { pipeline } from 'node:stream/promises'
 import { Readable } from 'node:stream'
 import path from 'node:path'
 import { DATA_DIR } from './config.ts'
 import { getCheckout, nextQueued, updateCheckout, type CheckoutRow } from './checkouts.ts'
 import { TRANSCODE_PROFILES } from './profiles.ts'
-import { client, libraryDirs, primaryContext, transferConcurrency } from './servers.ts'
+import { client, libraryDirs, minFreeBytes, primaryContext, transferConcurrency } from './servers.ts'
 
 const TICK_MS = 2000
 const MAX_RETRIES = 5
@@ -68,6 +68,25 @@ async function transfer(row: CheckoutRow, log: (msg: string) => void): Promise<v
   const partial = partialPath(row.id)
   const transcode = row.profile !== 'original' ? TRANSCODE_PROFILES[row.profile] : undefined
   if (row.profile !== 'original' && !transcode) throw new Error(`Unknown profile: ${row.profile}`)
+
+  // Space guard: refuse to start a transfer that would drop the library volume
+  // below the configured floor (default 2 GB). Estimates count for transcodes.
+  if (row.bytes_total > 0) {
+    try {
+      const { moviesDir, showsDir } = libraryDirs()
+      const fs = await statfs((row.kind === 'Movie' ? moviesDir : showsDir) ?? path.dirname(dest))
+      const free = fs.bavail * fs.bsize
+      if (free - row.bytes_total < minFreeBytes()) {
+        throw new Error(
+          `Not enough disk space: ${(free / 1024 ** 3).toFixed(1)} GB free, item needs ` +
+            `${(row.bytes_total / 1024 ** 3).toFixed(1)} GB plus the ${(minFreeBytes() / 1024 ** 3).toFixed(0)} GB floor`,
+        )
+      }
+    } catch (err) {
+      if ((err as Error).message.startsWith('Not enough disk space')) throw err
+      // statfs failed (dir not created yet, etc.) — let the transfer attempt proceed.
+    }
+  }
 
   // Transcode streams are live encodes — no Range support, always start from zero.
   const offset = transcode ? 0 : await fileSizeOrZero(partial)

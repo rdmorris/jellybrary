@@ -51,9 +51,15 @@ db.exec(`
 const checkoutCols = new Set(
   (db.prepare(`PRAGMA table_info(checkouts)`).all() as unknown as { name: string }[]).map((c) => c.name),
 )
-if (!checkoutCols.has('next_retry_at')) {
-  db.exec(`ALTER TABLE checkouts ADD COLUMN next_retry_at INTEGER`) // ms epoch; NULL = ready now
+const addColumn = (name: string, ddl: string) => {
+  if (!checkoutCols.has(name)) db.exec(`ALTER TABLE checkouts ADD COLUMN ${name} ${ddl}`)
 }
+addColumn('next_retry_at', 'INTEGER') // ms epoch; NULL = ready now
+addColumn('provider_ids', 'TEXT') // JSON, e.g. {"Tmdb":"123","Imdb":"tt..."}
+addColumn('mobile_played', 'INTEGER NOT NULL DEFAULT 0') // watch state observed on the mobile server
+addColumn('mobile_position', 'INTEGER NOT NULL DEFAULT 0') // PlaybackPositionTicks on mobile
+addColumn('synced_played', 'INTEGER NOT NULL DEFAULT 0') // last state pushed to the primary
+addColumn('synced_position', 'INTEGER NOT NULL DEFAULT 0')
 
 const getStmt = db.prepare('SELECT value FROM settings WHERE key = ?')
 const setStmt = db.prepare(

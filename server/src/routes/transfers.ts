@@ -14,6 +14,8 @@ import {
 import type { JellyfinItem } from '../jellyfin.ts'
 import { TRANSCODE_PROFILES, estimateBytes, isValidProfile } from '../profiles.ts'
 import { client, libraryDirs, primaryContext } from '../servers.ts'
+import { getSetting } from '../db.ts'
+import { syncWatchState } from '../sync.ts'
 import { abortTransfer, partialPath, wake } from '../worker.ts'
 
 function toNewCheckout(item: JellyfinItem, profile: string): NewCheckout {
@@ -30,45 +32,68 @@ function toNewCheckout(item: JellyfinItem, profile: string): NewCheckout {
     bytes_total:
       profile === 'original' ? source?.Size ?? 0 : estimateBytes(profile, item.RunTimeTicks),
     source_name: item.Path ? path.basename(item.Path) : source?.Path ? path.basename(source.Path) : null,
+    provider_ids: item.ProviderIds && Object.keys(item.ProviderIds).length ? JSON.stringify(item.ProviderIds) : null,
   }
+}
+
+function episodeOrder(a: JellyfinItem, b: JellyfinItem): number {
+  return (a.ParentIndexNumber ?? 0) - (b.ParentIndexNumber ?? 0) || (a.IndexNumber ?? 0) - (b.IndexNumber ?? 0)
 }
 
 export function transferRoutes(app: FastifyInstance) {
   app.get('/api/profiles', async () => TRANSCODE_PROFILES)
 
   // Queue a checkout. Movies/episodes queue directly; series/seasons expand to episodes.
-  app.post<{ Body: { itemId?: string; profile?: string } }>('/api/checkouts', async (req, reply) => {
-    const ctx = primaryContext()
-    if (!ctx) return reply.code(409).send({ error: 'not_configured' })
-    const itemId = req.body?.itemId
-    if (!itemId) return reply.code(400).send({ error: 'itemId required' })
-    const profile = req.body?.profile ?? 'original'
-    if (!isValidProfile(profile)) return reply.code(400).send({ error: `unknown profile: ${profile}` })
+  app.post<{ Body: { itemId?: string; profile?: string; mode?: string; count?: number } }>(
+    '/api/checkouts',
+    async (req, reply) => {
+      const ctx = primaryContext()
+      if (!ctx) return reply.code(409).send({ error: 'not_configured' })
+      const itemId = req.body?.itemId
+      if (!itemId) return reply.code(400).send({ error: 'itemId required' })
+      const profile = req.body?.profile ?? 'original'
+      if (!isValidProfile(profile)) return reply.code(400).send({ error: `unknown profile: ${profile}` })
+      const mode = req.body?.mode ?? 'all' // 'all' | 'unwatched'
+      const count = req.body?.count // with mode=unwatched: only the next N
 
-    const item = await ctx.client.item(ctx.userId, itemId)
-    let queued = 0
-    let skipped = 0
+      const item = await ctx.client.item(ctx.userId, itemId)
+      let queued = 0
+      let skipped = 0
 
-    if (item.Type === 'Movie' || item.Type === 'Episode') {
-      addCheckout(toNewCheckout(item, profile)) ? queued++ : skipped++
-    } else if (item.Type === 'Series' || item.Type === 'Season') {
-      const seriesId = item.Type === 'Season' ? (item as { SeriesId?: string }).SeriesId ?? itemId : itemId
-      const eps = await ctx.client.episodes(ctx.userId, seriesId)
-      const wanted =
-        item.Type === 'Season'
-          ? eps.Items.filter((e) => e.ParentIndexNumber === item.IndexNumber)
-          : eps.Items
-      for (const ep of wanted) {
-        // Skip specials/virtual items with no file behind them.
-        if (!ep.Path && !ep.MediaSources?.[0]?.Path) continue
-        addCheckout(toNewCheckout(ep, profile)) ? queued++ : skipped++
+      if (item.Type === 'Movie' || item.Type === 'Episode') {
+        addCheckout(toNewCheckout(item, profile)) ? queued++ : skipped++
+      } else if (item.Type === 'Series' || item.Type === 'Season') {
+        const seriesId = item.Type === 'Season' ? (item as { SeriesId?: string }).SeriesId ?? itemId : itemId
+        const eps = await ctx.client.episodes(ctx.userId, seriesId)
+        let wanted = (
+          item.Type === 'Season'
+            ? eps.Items.filter((e) => e.ParentIndexNumber === item.IndexNumber)
+            : eps.Items
+        )
+          // Skip specials/virtual items with no file behind them.
+          .filter((ep) => ep.Path || ep.MediaSources?.[0]?.Path)
+          .sort(episodeOrder)
+        if (mode === 'unwatched') {
+          wanted = wanted.filter((ep) => !ep.UserData?.Played)
+          if (count && count > 0) wanted = wanted.slice(0, count)
+        }
+        for (const ep of wanted) {
+          addCheckout(toNewCheckout(ep, profile)) ? queued++ : skipped++
+        }
+      } else {
+        return reply.code(400).send({ error: `cannot check out item type ${item.Type}` })
       }
-    } else {
-      return reply.code(400).send({ error: `cannot check out item type ${item.Type}` })
-    }
 
-    wake()
-    return { queued, skipped }
+      wake()
+      return { queued, skipped }
+    },
+  )
+
+  // Watch-state sync: mobile → primary. Manual trigger + last-run summary.
+  app.post('/api/sync', async () => syncWatchState((m) => app.log.info(m)))
+  app.get('/api/sync', async () => {
+    const last = getSetting('sync.last')
+    return last ? JSON.parse(last) : null
   })
 
   app.get('/api/checkouts', async () => {

@@ -30,9 +30,20 @@ export interface Settings {
   'primary.userId': string | null
   'mobile.url': string | null
   'mobile.apiKey': string | null
+  'mobile.userId': string | null
   'mobile.moviesDir': string | null
   'mobile.showsDir': string | null
   'transfer.concurrency': string | null
+  'transfer.minFreeGB': string | null
+}
+
+export interface SyncSummary {
+  ranAt: string
+  checked: number
+  matched: number
+  pushedPlayed: number
+  pushedPosition: number
+  errors: string[]
 }
 
 export interface TestResult {
@@ -58,6 +69,8 @@ export interface Checkout {
   bytes_done: number
   local_path: string | null
   error: string | null
+  mobile_played: number
+  mobile_position: number
   created_at: string
   updated_at: string
 }
@@ -120,8 +133,10 @@ export const api = {
   },
   item: (id: string) => req<JellyfinItem>('GET', `/api/browse/items/${id}`),
   profiles: () => req<Record<string, TranscodeProfile>>('GET', '/api/profiles'),
-  checkOut: (itemId: string, profile = 'original') =>
-    req<{ queued: number; skipped: number }>('POST', '/api/checkouts', { itemId, profile }),
+  checkOut: (itemId: string, profile = 'original', mode = 'all', count?: number) =>
+    req<{ queued: number; skipped: number }>('POST', '/api/checkouts', { itemId, profile, mode, count }),
+  sync: () => req<SyncSummary>('POST', '/api/sync'),
+  lastSync: () => req<SyncSummary | null>('GET', '/api/sync'),
   checkouts: () => req<CheckoutsResult>('GET', '/api/checkouts'),
   cancelCheckout: (id: number) => req<{ ok: true }>('DELETE', `/api/checkouts/${id}`),
   retryCheckout: (id: number) => req<{ ok: true }>('POST', `/api/checkouts/${id}/retry`),

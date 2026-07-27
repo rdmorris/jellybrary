@@ -205,6 +205,65 @@ export class JellyfinClient {
     await this.request('/Library/Refresh', undefined, { method: 'POST' })
   }
 
+  /** Find items by external provider IDs, e.g. { Tmdb: "123" }. */
+  async itemsByProviderIds(userId: string, providerIds: Record<string, string>): Promise<JellyfinItem[]> {
+    const pairs = Object.entries(providerIds)
+      .map(([k, v]) => `${k.toLowerCase()}.${v}`)
+      .join(',')
+    if (!pairs) return []
+    const res = await this.getJson<JellyfinItemsResult>('/Items', {
+      userId,
+      recursive: true,
+      anyProviderIdEquals: pairs,
+      fields: 'Path,ProviderIds',
+    })
+    return res.Items
+  }
+
+  /** Search items by name; used as a fallback matcher when provider IDs are missing. */
+  async searchItems(userId: string, term: string, types: string): Promise<JellyfinItem[]> {
+    const res = await this.getJson<JellyfinItemsResult>('/Items', {
+      userId,
+      recursive: true,
+      searchTerm: term,
+      includeItemTypes: types,
+      fields: 'Path,ProviderIds',
+      limit: 20,
+    })
+    return res.Items
+  }
+
+  async setPlayed(userId: string, itemId: string, played: boolean): Promise<void> {
+    await this.request(`/Users/${userId}/PlayedItems/${itemId}`, undefined, {
+      method: played ? 'POST' : 'DELETE',
+    })
+  }
+
+  /** Push a resume position (ticks) to the server. */
+  async setPosition(userId: string, itemId: string, positionTicks: number): Promise<void> {
+    const url = new URL(`${this.baseUrl}/Users/${userId}/Items/${itemId}/UserData`)
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { ...this.headers(), 'content-type': 'application/json' },
+      body: JSON.stringify({ PlaybackPositionTicks: positionTicks }),
+      signal: AbortSignal.timeout(15_000),
+    })
+    if (res.status === 404 || res.status === 405) {
+      // Newer Jellyfin moved this endpoint.
+      const alt = new URL(`${this.baseUrl}/Items/${itemId}/UserData`)
+      alt.searchParams.set('userId', userId)
+      const res2 = await fetch(alt, {
+        method: 'POST',
+        headers: { ...this.headers(), 'content-type': 'application/json' },
+        body: JSON.stringify({ PlaybackPositionTicks: positionTicks }),
+        signal: AbortSignal.timeout(15_000),
+      })
+      if (!res2.ok) throw new JellyfinError(`Setting position failed with ${res2.status}`, res2.status)
+      return
+    }
+    if (!res.ok) throw new JellyfinError(`Setting position failed with ${res.status}`, res.status)
+  }
+
   /** Raw image response, for proxying to the browser without exposing the API key. */
   image(itemId: string, type: string, params: { tag?: string; maxWidth?: number }): Promise<Response> {
     return this.request(`/Items/${itemId}/Images/${type}`, {

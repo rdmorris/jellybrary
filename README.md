@@ -10,11 +10,16 @@ when done. See [PLAN.md](PLAN.md) for the full design.
 ![Browsing the primary library in Jellybrary](docs/screenshot-browse.png)
 *(shown with the bundled mock library — your real posters appear with a real server)*
 
-**Status: milestone 3** — browse the primary library, check out movies or whole series
-at **original quality or as a 1080p/720p HEVC transcode** (with size estimates), watch
-transfers with progress/resume, and return items to free space. Set the **Library
-paths** in Settings so checkouts know where to land. Watch-state sync comes in
-milestone 4.
+**Status: milestone 4 — feature complete for v0.1.** Browse the primary library; check
+out movies, whole series, or the **next N unwatched episodes** at original quality or
+as a 1080p/720p HEVC transcode (with size estimates); watch transfers with
+progress/resume; and return items — individually, per show, or **everything you've
+watched** in one click. **Watch-state sync** pushes played status and resume positions
+from the mobile server back to the primary (matched by provider IDs, filename
+fallback), so Continue Watching survives a trip; it runs every 10 minutes and on
+demand. A **disk-space floor** (default 2 GB, Settings → Library paths) keeps
+transfers from filling the truck drive. Set the Library paths and a mobile
+watch-state user in Settings to enable everything.
 
 Transcodes are performed by the *primary* Jellyfin server via its stream API, using
 whatever hardware acceleration it has configured (Dashboard → Playback). Enable

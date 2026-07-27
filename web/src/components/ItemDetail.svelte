@@ -18,6 +18,7 @@
   let result = $state('')
   let profiles = $state<Record<string, TranscodeProfile>>({})
   let profile = $state('original')
+  let scope = $state('all') // for series: all | unwatched | next5 | next10
 
   $effect(() => {
     api.profiles().then((p) => (profiles = p)).catch(() => {})
@@ -36,7 +37,9 @@
     working = true
     result = ''
     try {
-      const res = await api.checkOut(item.Id, profile)
+      const mode = scope === 'all' ? 'all' : 'unwatched'
+      const count = scope === 'next5' ? 5 : scope === 'next10' ? 10 : undefined
+      const res = await api.checkOut(item.Id, profile, mode, count)
       if (res.queued === 0 && res.skipped > 0) result = 'Already checked out'
       else if (res.skipped > 0) result = `Queued ${res.queued} (${res.skipped} already on device)`
       else result = res.queued === 1 ? 'Queued ✓' : `Queued ${res.queued} episodes ✓`
@@ -84,6 +87,14 @@
           <p class="overview">{item.Overview}</p>
         {/if}
         <div class="actions">
+          {#if item.Type === 'Series' || item.Type === 'Season'}
+            <select class="profile" bind:value={scope} title="Which episodes to check out">
+              <option value="all">All episodes</option>
+              <option value="unwatched">All unwatched</option>
+              <option value="next5">Next 5 unwatched</option>
+              <option value="next10">Next 10 unwatched</option>
+            </select>
+          {/if}
           <select class="profile" bind:value={profile} title="Quality — transcodes run on the primary server">
             <option value="original">{optionLabel('original')}</option>
             {#each Object.entries(profiles) as [name, spec] (name)}

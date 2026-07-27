@@ -1,10 +1,39 @@
 <script lang="ts">
-  import { api, formatBytes, type Checkout, type DeviceSpace } from '../lib/api'
+  import { api, formatBytes, type Checkout, type DeviceSpace, type SyncSummary } from '../lib/api'
 
   let checkouts = $state<Checkout[]>([])
   let space = $state<DeviceSpace | null>(null)
   let loaded = $state(false)
   let returning = $state<Set<number>>(new Set())
+  let syncing = $state(false)
+  let lastSync = $state<SyncSummary | null>(null)
+
+  async function runSync() {
+    syncing = true
+    try {
+      lastSync = await api.sync()
+      await refresh()
+    } catch (e) {
+      lastSync = {
+        ranAt: new Date().toISOString(),
+        checked: 0,
+        matched: 0,
+        pushedPlayed: 0,
+        pushedPosition: 0,
+        errors: [(e as Error).message],
+      }
+    } finally {
+      syncing = false
+    }
+  }
+
+  function syncLabel(s: SyncSummary): string {
+    if (s.errors.length) return `Sync issues: ${s.errors[0]}`
+    const parts = []
+    if (s.pushedPlayed) parts.push(`${s.pushedPlayed} marked watched on primary`)
+    if (s.pushedPosition) parts.push(`${s.pushedPosition} resume positions pushed`)
+    return parts.length ? parts.join(', ') : `Up to date (${s.matched} of ${s.checked} matched)`
+  }
 
   async function refresh() {
     const [res, sp] = await Promise.all([api.checkouts(), api.deviceSpace()])
@@ -15,6 +44,7 @@
 
   $effect(() => {
     void refresh()
+    api.lastSync().then((s) => (lastSync = s)).catch(() => {})
   })
 
   const onDevice = $derived(checkouts.filter((c) => c.status === 'on_device'))
@@ -27,6 +57,7 @@
     })),
   )
   const totalBytes = $derived(onDevice.reduce((sum, c) => sum + (c.bytes_total || 0), 0))
+  const watched = $derived(onDevice.filter((c) => c.mobile_played))
   const usedPct = $derived(
     space?.configured && space.totalBytes ? (1 - (space.freeBytes ?? 0) / space.totalBytes) * 100 : 0,
   )
@@ -46,7 +77,23 @@
   }
 </script>
 
-<h1>On Device</h1>
+<h1>
+  On Device
+  <span class="toolbar">
+    <button onclick={runSync} disabled={syncing}>{syncing ? 'Syncing…' : '⟳ Sync watched'}</button>
+    {#if watched.length}
+      <button
+        disabled={watched.some((c) => returning.has(c.id))}
+        onclick={() => giveBack(watched.map((c) => c.id))}
+      >
+        Return all watched ({watched.length})
+      </button>
+    {/if}
+  </span>
+</h1>
+{#if lastSync}
+  <p class="muted sync-note">{syncLabel(lastSync)}</p>
+{/if}
 
 {#if !loaded}
   <p class="muted">Loading…</p>
@@ -72,7 +119,10 @@
         {#each movies as c (c.id)}
           <div class="card row">
             <div class="info">
-              <div class="title">{c.title}{c.year ? ` (${c.year})` : ''}</div>
+              <div class="title">
+                {c.title}{c.year ? ` (${c.year})` : ''}
+                {#if c.mobile_played}<span class="watched" title="Watched on the road">✓ watched</span>{/if}
+              </div>
               <div class="sub muted">
                 {formatBytes(c.bytes_total)}{c.profile !== 'original' ? ` · ${c.profile}` : ''} · {c.local_path}
               </div>
@@ -100,7 +150,10 @@
         {#each show.eps as c (c.id)}
           <div class="card row">
             <div class="info">
-              <div class="title">{epLabel(c)}</div>
+              <div class="title">
+                {epLabel(c)}
+                {#if c.mobile_played}<span class="watched" title="Watched on the road">✓ watched</span>{/if}
+              </div>
               <div class="sub muted">{formatBytes(c.bytes_total)}</div>
             </div>
             <button disabled={returning.has(c.id)} onclick={() => giveBack([c.id])}>
@@ -114,6 +167,38 @@
 {/if}
 
 <style>
+  h1 {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .toolbar {
+    display: flex;
+    gap: 10px;
+  }
+
+  .toolbar button {
+    font-size: 14px;
+  }
+
+  .sync-note {
+    font-size: 13px;
+    margin: -8px 0 16px;
+  }
+
+  .watched {
+    font-size: 11px;
+    color: var(--ok);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 1px 8px;
+    margin-left: 8px;
+    vertical-align: 2px;
+  }
+
   .meter-card {
     padding: 14px 18px;
     margin-bottom: 20px;
