@@ -1,8 +1,11 @@
-# Cloud Clone
+# Jellybrary
 
-Library-checkout for Jellyfin: browse your primary (home) server, check media out to a
-secondary mobile Jellyfin server (truck/RV) for off-grid use, and return it when done.
-See [PLAN.md](PLAN.md) for the full design.
+A bookmobile for your Jellyfin server: browse your primary (home) server, check media
+out to a secondary mobile Jellyfin server (truck/RV) for off-grid use, and return it
+when done. See [PLAN.md](PLAN.md) for the full design.
+
+*Jellybrary is a community project, not affiliated with or endorsed by the
+[Jellyfin](https://jellyfin.org) project.*
 
 **Status: milestone 2** — browse the primary library, check out movies or whole series,
 watch transfers with progress/resume, and return items to free space. Set the
@@ -47,8 +50,8 @@ npm run build      # builds web/dist, typechecks server
 npm start          # serves API + built UI on :3131
 ```
 
-Config lives in `data/cloud-clone.db` (SQLite). Env vars: `CLOUD_CLONE_PORT`,
-`CLOUD_CLONE_HOST`, `CLOUD_CLONE_DATA`.
+Config lives in `data/jellybrary.db` (SQLite). Env vars: `JELLYBRARY_PORT`,
+`JELLYBRARY_HOST`, `JELLYBRARY_DATA`.
 
 ## Layout
 

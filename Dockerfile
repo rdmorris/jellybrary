@@ -11,7 +11,7 @@ RUN npm run build
 # Runtime stage: server deps only + built UI; Node 24 runs the TS sources directly
 FROM node:24-alpine
 WORKDIR /app
-ENV NODE_ENV=production CLOUD_CLONE_DATA=/data
+ENV NODE_ENV=production JELLYBRARY_DATA=/data
 COPY package.json package-lock.json ./
 COPY server/package.json server/
 COPY web/package.json web/

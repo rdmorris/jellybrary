@@ -1,4 +1,4 @@
-# Cloud Clone — Design & Implementation Plan
+# Jellybrary — Design & Implementation Plan
 
 A "library checkout" system for media. Browse your primary Jellyfin library, check out
 movies/shows to a secondary mobile Jellyfin server (truck/RV), watch off-grid, return
@@ -11,12 +11,12 @@ items to free space. Think Netflix downloads, but server-to-server and self-host
 ┌──────────────────────────┐              ┌──────────────────────────────┐
 │ Primary Jellyfin server  │   home LAN   │ Mobile server                │
 │  - media library         │◄────────────►│  - Jellyfin (mobile library) │
-│  - Jellyfin HTTP API     │  (when       │  - Cloud Clone service  ◄────┼── web UI
+│  - Jellyfin HTTP API     │  (when       │  - Jellybrary service  ◄────┼── web UI
 │  - (no new software!)    │   parked)    │  - SQLite state              │
 └──────────────────────────┘              └──────────────────────────────┘
 ```
 
-**Key decision: Cloud Clone runs only on the mobile server.** Nothing is installed on
+**Key decision: Jellybrary runs only on the mobile server.** Nothing is installed on
 the primary — everything it needs (browse, metadata, images, file download, and even
 server-side transcoding) is available through the standard Jellyfin HTTP API. The mobile
 node *pulls* when the primary is reachable, which is naturally correct for a vehicle
@@ -56,7 +56,7 @@ When back on the home LAN, reconcile playback between the two servers: anything 
 the primary, so Continue Watching stays coherent. Items are matched by provider IDs
 (TMDB/IMDB/TVDB) with filename fallback.
 
-## Web UI (served by the Cloud Clone service)
+## Web UI (served by the Jellybrary service)
 
 1. **Browse** — the primary library with posters, search, and filters, via the Jellyfin
    API. Badges show what's already checked out. Series pages support "whole series /
@@ -80,12 +80,13 @@ before you commit to a big checkout.
 
 ## Stack
 
-- **Runtime:** Node 22 + TypeScript, single service, Docker Compose for the truck box.
-- **API server:** Fastify. **Frontend:** Svelte 5 + Vite (SvelteKit in SPA/static mode,
-  served by the Fastify service; TanStack Query for Svelte for server state).
-- **DB:** SQLite via Drizzle ORM (single file, trivial backup).
-- **Jellyfin client:** `@jellyfin/sdk` (official TS SDK) for both servers.
-- **Testing:** Vitest; a mock Jellyfin server fixture for the sync engine.
+- **Runtime:** Node 24 + TypeScript (native type stripping — no build step for the
+  server), single service, Docker Compose for the truck box.
+- **API server:** Fastify. **Frontend:** Svelte 5 + Vite SPA, served by Fastify in prod.
+- **DB:** built-in `node:sqlite` (no native modules, single file, trivial backup).
+- **Jellyfin client:** small hand-rolled fetch client (`server/src/jellyfin.ts`).
+- **Testing:** mock Jellyfin server (`tools/mock-jellyfin.mjs`) with Range-aware
+  downloads and tunable stream speed.
 
 ## Milestones
 
@@ -110,5 +111,5 @@ on the user's hardware is a better security story than any cloud can offer.
   unless you want Jellyfin-account login.
 - Mobile server hardware/OS — affects Docker vs. bare-metal install docs, and whether
   H.265 playback is safe as the default transcode target for your truck clients.
-- Where the mobile Jellyfin's library folders live (path Cloud Clone writes into) —
+- Where the mobile Jellyfin's library folders live (path Jellybrary writes into) —
   needs to be a volume both containers can see if everything is Dockerized.

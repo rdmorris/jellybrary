@@ -90,7 +90,7 @@
 
 {#if notConfigured}
   <div class="card empty">
-    <h2>Welcome to Cloud Clone</h2>
+    <h2>Welcome to Jellybrary</h2>
     <p class="muted">
       Connect your primary Jellyfin server to start browsing your library, then check media out to
       your mobile server for the road.

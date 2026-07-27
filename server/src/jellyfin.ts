@@ -62,7 +62,7 @@ export class JellyfinClient {
 
   private headers(): Record<string, string> {
     return {
-      Authorization: `MediaBrowser Client="CloudClone", Device="CloudClone", DeviceId="cloud-clone", Version="0.1.0", Token="${this.apiKey}"`,
+      Authorization: `MediaBrowser Client="Jellybrary", Device="Jellybrary", DeviceId="jellybrary", Version="0.1.0", Token="${this.apiKey}"`,
     }
   }
 

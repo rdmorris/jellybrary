@@ -1,4 +1,4 @@
-// Tiny mock of the Jellyfin API surface Cloud Clone uses, for dev without a real server.
+// Tiny mock of the Jellyfin API surface Jellybrary uses, for dev without a real server.
 //   node tools/mock-jellyfin.mjs [port]   (default 8097; API key is "mock")
 import http from 'node:http'
 

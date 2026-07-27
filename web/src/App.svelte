@@ -30,7 +30,7 @@
 <header>
   <a class="brand" href="#/browse">
     <img src="/favicon.svg" alt="" width="26" height="26" />
-    <span>Cloud Clone</span>
+    <span>Jellybrary</span>
   </a>
   <nav>
     {#each tabs as tab (tab.id)}

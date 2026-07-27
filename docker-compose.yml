@@ -1,9 +1,9 @@
 # Runs on the MOBILE server (truck/RV) alongside its Jellyfin.
 services:
-  cloud-clone:
+  jellybrary:
     build: .
-    image: cloud-clone:latest
-    container_name: cloud-clone
+    image: jellybrary:latest
+    container_name: jellybrary
     restart: unless-stopped
     ports:
       - "3131:3131"

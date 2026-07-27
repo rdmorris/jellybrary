@@ -9,7 +9,7 @@ import { startWorker } from './worker.ts'
 
 const app = Fastify({ logger: { level: 'info' } })
 
-app.get('/api/health', async () => ({ ok: true, name: 'cloud-clone', version: '0.1.0' }))
+app.get('/api/health', async () => ({ ok: true, name: 'jellybrary', version: '0.1.0' }))
 
 settingsRoutes(app)
 browseRoutes(app)

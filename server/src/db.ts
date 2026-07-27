@@ -1,8 +1,21 @@
 import { DatabaseSync } from 'node:sqlite'
+import { existsSync, renameSync } from 'node:fs'
 import path from 'node:path'
 import { DATA_DIR } from './config.ts'
 
-export const db = new DatabaseSync(path.join(DATA_DIR, 'cloud-clone.db'))
+const DB_PATH = path.join(DATA_DIR, 'jellybrary.db')
+const LEGACY_DB_PATH = path.join(DATA_DIR, 'cloud-clone.db')
+// Migrate databases created before the rename to Jellybrary. The DB runs in WAL mode,
+// so checkpoint the legacy WAL into the main file first — renaming only the .db would
+// orphan the -wal file and silently lose recent writes.
+if (!existsSync(DB_PATH) && existsSync(LEGACY_DB_PATH)) {
+  const legacy = new DatabaseSync(LEGACY_DB_PATH)
+  legacy.exec('PRAGMA wal_checkpoint(TRUNCATE)')
+  legacy.close()
+  renameSync(LEGACY_DB_PATH, DB_PATH)
+}
+
+export const db = new DatabaseSync(DB_PATH)
 
 db.exec(`
   PRAGMA journal_mode = WAL;

@@ -1,8 +1,8 @@
 {
-  "name": "cloud-clone",
+  "name": "jellybrary",
   "private": true,
   "version": "0.1.0",
-  "description": "Library-checkout system for Jellyfin: check out media from a primary server to a mobile off-grid server",
+  "description": "A bookmobile for your Jellyfin server: check out media from a primary server to a mobile off-grid server",
   "type": "module",
   "workspaces": [
     "server",
