@@ -46,16 +46,29 @@ No Jellyfin handy? Run the mock: `node tools/mock-jellyfin.mjs` (URL
 
 ## Run (Docker — the intended deployment)
 
-Runs on the **mobile** server, next to its Jellyfin:
+Jellybrary runs on the **mobile** machine — a truck/RV server, or just a laptop you
+travel with. Two compose files, pick one:
 
-```sh
-docker compose up -d --build   # UI + API on :3131
-```
+- **Already run Jellyfin on that machine?** Use [docker-compose.yml](docker-compose.yml)
+  — Jellybrary only. Mount your Jellyfin library folder and point the Settings paths
+  at it.
 
-Settings persist in `./data` (bind-mounted to `/data`). The container runs as the
-`node` user (uid 1000), so make sure `./data` is writable by that uid. In milestone 2
-you'll also mount the mobile Jellyfin's media folder — see the comment in
-[docker-compose.yml](docker-compose.yml).
+  ```sh
+  docker compose up -d --build   # UI + API on :3131
+  ```
+
+- **Fresh machine, no Jellyfin yet?** Use
+  [docker-compose.with-jellyfin.yml](docker-compose.with-jellyfin.yml) — brings up
+  Jellyfin (linuxserver.io image) and Jellybrary together with a shared `./media`
+  folder, pre-wired so the library paths match in both containers. First-run steps are
+  in the file's header comment.
+
+  ```sh
+  docker compose -f docker-compose.with-jellyfin.yml up -d --build
+  ```
+
+Settings persist in `./data` (bind-mounted to `/data`). Both containers run as
+uid 1000, so make sure `./data` and `./media` are writable by that uid.
 
 ## Run (production-ish, no Docker)
 

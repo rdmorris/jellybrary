@@ -1,4 +1,5 @@
-# Runs on the MOBILE server (truck/RV) alongside its Jellyfin.
+# Jellybrary only — for a mobile machine that ALREADY runs Jellyfin locally.
+# No Jellyfin yet? Use docker-compose.with-jellyfin.yml for the full stack.
 services:
   jellybrary:
     build: .
@@ -9,5 +10,6 @@ services:
       - "3131:3131"
     volumes:
       - ./data:/data
-      # Milestone 2: mount the mobile Jellyfin's library so checkouts land in it, e.g.
+      # Mount the mobile Jellyfin's library so checkouts land in it, then set the
+      # Settings → Library paths to the container-side paths (e.g. /media/movies):
       # - /path/to/jellyfin/media:/media
